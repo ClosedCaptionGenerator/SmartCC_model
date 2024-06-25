@@ -1,0 +1,9 @@
+# data directory
+
+data/
+*.wav
+
+# wandb
+wandb/
+
+.DS_Store

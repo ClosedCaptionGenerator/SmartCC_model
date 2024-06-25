@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "model"
+version = "0.1.0"
+description = ""
+authors = ["Seokkyu Lee <cd1004s@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+torch = "^2.3.1"
+librosa = "*"
+h5py = "^3.11.0"
+numpy = "<2"
+wandb = "^0.17.3"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
