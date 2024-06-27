@@ -2,7 +2,7 @@ import os
 import json
 import torch
 import librosa
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, Subset
 import numpy as np
 from pathlib import Path
 
@@ -96,6 +96,9 @@ class AudioDataset(Dataset):
         return self.label_dict.get(label, -1)
 
 
-def get_data_loader(root_dir, batch_size, transform=None, shuffle=True):
+def get_data_loader(root_dir, batch_size, transform=None, shuffle=True, subset=None):
     dataset = AudioDataset(root_dir, transform)
+    if subset:
+        subset_size = int(len(dataset) * subset)
+        dataset = Subset(dataset, range(subset_size))
     return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)

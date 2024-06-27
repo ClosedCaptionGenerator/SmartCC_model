@@ -1,0 +1,26 @@
+# sweep.yaml
+program: optimize.py
+method: bayes  # Optimization method: grid, random, bayes
+metric:
+  name: val_loss
+  goal: minimize
+parameters:
+  out_channels:
+    distribution: int_uniform
+    min: 8
+    max: 32
+  dropout_p:
+    distribution: uniform
+    min: 0.2
+    max: 0.5
+  learning_rate:
+    distribution: log_uniform
+    min: 1e-5
+    max: 1e-3
+  batch_size:
+    values: [8, 16]
+command:
+  - ${env}
+  - python
+  - ${program}
+  - --use_subset
