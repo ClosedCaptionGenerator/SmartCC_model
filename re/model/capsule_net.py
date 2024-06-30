@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from .capsule_layers import PrimaryCapsules, DigitCapsules
 
 class CapsuleNet(nn.Module):
-    def __init__(self, num_classes=24):
+    def __init__(self, num_classes=24):  # Update the number of classes to 24
         super(CapsuleNet, self).__init__()
         self.conv_layer = nn.Conv2d(in_channels=1, out_channels=256, kernel_size=19, stride=1)
         self.primary_capsules = PrimaryCapsules(num_capsules=32, in_channels=256, out_channels=8, kernel_size=9, stride=2)
@@ -25,6 +25,5 @@ class CapsuleNet(nn.Module):
         reconstructions = self.decoder(x.view(x.size(0), -1))
         return x, reconstructions
 
-# Ensure to include a statement to register the model
 def capsule_net(num_classes=24):
     return CapsuleNet(num_classes)

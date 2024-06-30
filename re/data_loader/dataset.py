@@ -7,10 +7,10 @@ from torch.utils.data import Dataset, DataLoader, Subset
 from pathlib import Path
 
 class AudioDataset(Dataset):
-    def __init__(self, root_dir, transform=None, fixed_length=220500):
+    def __init__(self, root_dir, transform=None, fixed_length=220500):  # fixed_length is set to 5 seconds of audio at 44100 Hz
         self.root_dir = root_dir
         self.transform = transform
-        self.fixed_length = fixed_length
+        self.fixed_length = fixed_length  # Define a fixed length for all audio samples
         self.audio_files = []
         self.labels = []
         self.label_dict = self._create_label_dict()
@@ -97,10 +97,3 @@ class AudioDataset(Dataset):
         if label not in self.label_dict.keys():
             print(f'Unknown label: {label}')
         return self.label_dict.get(label, -1)
-
-def get_data_loader(root_dir, batch_size, transform=None, shuffle=True, subset=None):
-    dataset = AudioDataset(root_dir, transform)
-    if subset:
-        subset_size = int(len(dataset) * subset)
-        dataset = Subset(dataset, range(subset_size))
-    return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)

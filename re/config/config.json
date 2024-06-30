@@ -5,6 +5,6 @@
     "lr": 0.001,
     "seed": 1,
     "log_interval": 10,
-    "train_data": "/mnt/data/data_model/",
+    "train_data": "path_to_train_dir",
     "val_data": "path_to_val_dir"
 }
