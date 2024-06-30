@@ -29,7 +29,6 @@ class CapsLayer(nn.Module):
         batch_size = x.size(0)
         x_hat = torch.matmul(self.weights, x[:, None, :, :, None]).squeeze(-1)
         x_hat_detached = x_hat.detach()
-
         b = Variable(torch.zeros(batch_size, x.size(1), self.num_capsule, 1)).to(x.device)
 
         for i in range(self.routings):
@@ -64,11 +63,8 @@ class PrimaryCapsLayer(nn.Module):
 class CapsNet(nn.Module):
     def __init__(self, input_shape, n_class, routings):
         super(CapsNet, self).__init__()
-        self.conv1 = nn.Conv2d(in_channels=input_shape[0], out_channels=8, kernel_size=(5, 5), stride=(2, 3),
-                               padding='same')
-        self.conv2 = nn.Conv2d(in_channels=8, out_channels=256, kernel_size=(5, 5), stride=(1, 2), padding='valid')
-        self.primaryCaps = PrimaryCapsLayer(input_channels=256, dim_capsule=8, n_channels=32, kernel_size=9, stride=2,
-                                            padding='valid')
+        self.conv1 = nn.Conv2d(in_channels=input_shape[0], out_channels=256, kernel_size=(19, 19), stride=(1, 1), padding='valid')
+        self.primaryCaps = PrimaryCapsLayer(input_channels=256, dim_capsule=8, n_channels=32, kernel_size=9, stride=2, padding='valid')
         self.digitCaps = CapsLayer(num_capsule=n_class, dim_capsule=16, routings=routings, in_channels=32 * 6 * 6)
         self.decoder = nn.Sequential(
             nn.Linear(16 * n_class, 512),
@@ -83,7 +79,6 @@ class CapsNet(nn.Module):
 
     def forward(self, input):
         x = F.relu(self.conv1(input))
-        x = F.relu(self.conv2(x))
         x = self.primaryCaps(x)
         x = self.digitCaps(x)
         out_caps = x.pow(2).sum(dim=2).sqrt()
@@ -113,16 +108,14 @@ class ReconstructionNet(nn.Module):
         self.n_classes = n_classes
 
     def forward(self, x, target):
-        mask = Variable(torch.zeros((x.size()[0], self.n_classes)), requires_grad=False)
-        if next(self.parameters()).is_cuda:
-            mask = mask.cuda()
+        mask = torch.zeros((x.size()[0], self.n_classes)).to(x.device)
         mask.scatter_(1, target.view(-1, 1), 1.)
         mask = mask.unsqueeze(2)
         x = x * mask
         x = x.view(-1, self.n_dim * self.n_classes)
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
-        x = F.sigmoid(self.fc3(x))
+        x = torch.sigmoid(self.fc3(x))
         return x
 
 
@@ -176,36 +169,6 @@ class HDF5Dataset(Dataset):
             x_data = np.array(h5_file['mfcc'])
             y_data = np.array(h5_file['y'])
             return torch.tensor(x_data, dtype=torch.float32), torch.tensor(y_data, dtype=torch.long)
-
-
-# class MFCCDataset(Dataset):
-#     def __init__(self, data_dir, labels, height, width, n_label, train=True):
-#         self.data = []
-#         self.labels = []
-#         self.height = height
-#         self.width = width
-#
-#         for i in range(n_label):
-#             mfcc_file = f'{data_dir}/mfcc_y_{height}x{width}_{i}.h5'
-#             with h5py.File(mfcc_file, 'r') as f:
-#                 self.data.extend(f['mfcc'])
-#                 self.labels.extend(f['y'])
-#
-#         self.data = np.array(self.data).reshape(-1, 1, height, width)
-#         self.labels = np.array(self.labels)
-#         self.labels = np.argmax(self.labels, axis=1)
-#
-#         encoder = OneHotEncoder(sparse_output=False)
-#         self.labels = encoder.fit_transform(self.labels[:, None])
-#
-#         self.data = torch.tensor(self.data, dtype=torch.float32)
-#         self.labels = torch.tensor(self.labels, dtype=torch.float32)
-#
-#     def __len__(self):
-#         return len(self.data)
-#
-#     def __getitem__(self, idx):
-#         return self.data[idx], self.labels[idx]
 
 
 def load_dataset(train_data_dir, valid_data_dir, batch_size=32):

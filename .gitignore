@@ -1,6 +1,5 @@
 # data directory
 
-data/
 *.wav
 
 # wandb

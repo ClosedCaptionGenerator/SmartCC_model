@@ -4,7 +4,6 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import wandb
-import json
 from capsulelayers import CapsuleLayer
 from model_train import train
 from model_eval import evaluate
@@ -13,20 +12,28 @@ from hdf_validation import get_validation_loader
 from config import NUM_CLASSES, TRAIN_PATH, VALID_PATH
 
 
+# Model definition
 class CapsuleNetwork(nn.Module):
-    def __init__(self, num_classes, num_routes, in_channels, out_channels, dropout_p):
+    def __init__(self, num_classes, in_channels, dropout_p):
         super(CapsuleNetwork, self).__init__()
-        self.capsule_layer = CapsuleLayer(num_capsules=num_classes, num_routes=num_routes, in_channels=in_channels,
-                                          out_channels=out_channels)
-        self.fc = nn.Linear(num_classes * num_routes * out_channels, num_classes)
-        self.dropout = nn.Dropout(p=dropout_p)
+        self.conv1 = nn.Conv2d(in_channels, 256, kernel_size=9, stride=1)
+        self.primary_caps = PrimaryCapsLayer(input_channels=256, dim_capsule=8, n_channels=32, kernel_size=9, stride=2, padding=0)
+        self.digit_caps = CapsuleLayer(num_capsule=num_classes, dim_capsule=16, routings=3, in_channels=32*6*6)
+        self.decoder = nn.Sequential(
+            nn.Linear(16 * num_classes, 512),
+            nn.ReLU(),
+            nn.Linear(512, 1024),
+            nn.ReLU(),
+            nn.Linear(1024, 28 * 28),
+            nn.Sigmoid()
+        )
+        self.dropout = nn.Dropout(dropout_p)
 
     def forward(self, x):
-        x = self.capsule_layer(x)
-        x = x.view(x.size(0), -1)  # Flatten the tensor
-        x = self.dropout(x)
-        x = self.fc(x)
-        return x
+        x = F.relu(self.conv1(x))
+        x = self.primary_caps(x)
+        x = self.digit_caps(x).view(x.size(0), -1)
+        return self.decoder(x)
 
 
 def main():

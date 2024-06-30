@@ -1,5 +1,5 @@
 # config.py
-NUM_CLASSES = 24  # Update this value to match the actual number of classes
+NUM_CLASSES = 30  # Update this value to match the actual number of classes
 # BATCH_SIZE = 32
 BATCH_SIZE = 8
 NUM_EPOCHS = 10
