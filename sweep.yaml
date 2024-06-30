@@ -8,19 +8,25 @@ parameters:
   out_channels:
     distribution: int_uniform
     min: 8
-    max: 32
+    max: 64
   dropout_p:
     distribution: uniform
     min: 0.2
     max: 0.5
   learning_rate:
-    distribution: log_uniform
-    min: 1e-5
-    max: 1e-3
+    distribution: uniform
+    min: 0.00001
+    max: 0.001
   batch_size:
-    values: [8, 16]
+    values: [4, 8, 12]
 command:
   - ${env}
   - python
   - ${program}
   - --use_subset
+early_terminate:
+  type: hyperband
+  min_iter: 3
+  max_iter: 10
+  s: 2
+

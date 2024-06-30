@@ -4,12 +4,7 @@ import torch.optim as optim
 import time
 from capsulelayers import CapsuleLayer
 from hdf_train import get_train_loader
-from config import BATCH_SIZE, LEARNING_RATE, NUM_CLASSES, NUM_EPOCHS
-
-
-print(f"MPS build check : {torch.backends.mps.is_built()}")
-print(f"MPS available : {torch.backends.mps.is_available()}")
-# device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+from config import BATCH_SIZE, LEARNING_RATE, NUM_CLASSES, NUM_EPOCHS, TRAIN_PATH
 
 
 # Define the model architecture
@@ -45,11 +40,11 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device):
 
 
 def profile_training():
-    device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device : {device}")
 
     # Load a small subset of the data
-    train_loader = get_train_loader('data/train', BATCH_SIZE)
+    train_loader = get_train_loader(TRAIN_PATH, BATCH_SIZE)
     subset_size = int(0.001 * len(train_loader.dataset))  # 0.1% of the dataset
     subset_indices = list(range(subset_size))
     subset_loader = torch.utils.data.DataLoader(
@@ -72,7 +67,7 @@ def profile_training():
         print(f"Epoch {epoch + 1}, Loss: {avg_loss:.4f}, Time: {epoch_time:.2f}s")
 
     # Estimate total training time for the full dataset
-    estimated_time_per_epoch = (total_time / num_epochs) / 0.001
+    estimated_time_per_epoch = (total_time / num_epochs) / 0.01
     total_estimated_time = estimated_time_per_epoch * NUM_EPOCHS
     print(f"Estimated total training time for full dataset: {total_estimated_time / 3600:.2f} hours for {NUM_EPOCHS} epochs")
 

@@ -10,22 +10,7 @@ from model_train import train
 from model_eval import evaluate
 from hdf_train import get_train_loader
 from hdf_validation import get_validation_loader
-from config import NUM_CLASSES
-
-# print(f"MPS build check : {torch.backends.mps.is_built()}")
-# print(f"MPS available : {torch.backends.mps.is_available()}")
-# # device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
-#
-# wandb.init(
-#     project="capsuleNet",
-#     config={
-#         "learning_rate": LEARNING_RATE,
-#         "batch_size": BATCH_SIZE,
-#         "num_epochs": NUM_EPOCHS,
-#         "num_classes": NUM_CLASSES,
-#         "dropout_rate": DROPOUT_RATE,
-#     }
-# )
+from config import NUM_CLASSES, TRAIN_PATH, VALID_PATH
 
 
 class CapsuleNetwork(nn.Module):
@@ -46,7 +31,7 @@ class CapsuleNetwork(nn.Module):
 
 def main():
     # Initialize WandB
-    wandb.init(project="train", entity="seoku", config={
+    wandb.init(project="train_caps_aws", entity="seoku", config={
         "out_channels": 16,  # Default value, will be overridden by sweep
         "dropout_p": 0.3,  # Default value, will be overridden by sweep
         "learning_rate": 1e-4,  # Default value, will be overridden by sweep
@@ -63,8 +48,8 @@ def main():
     batch_size = config.batch_size
 
     # Get data loaders
-    train_loader = get_train_loader('data/train', batch_size)
-    val_loader = get_validation_loader('data/valid', batch_size)
+    train_loader = get_train_loader(TRAIN_PATH, batch_size)
+    val_loader = get_validation_loader(VALID_PATH, batch_size)
 
     # Initialize model, loss, optimizer, and scheduler
     device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
@@ -79,6 +64,8 @@ def main():
     best_val_loss = float('inf')
 
     num_epochs = 50  # Use more epochs for the final training
+    # grad_accum_steps = 4  # Set gradient accumulation steps
+    best_val_loss = float('inf')
     for epoch in range(num_epochs):
         train_loss = train(model, train_loader, criterion, optimizer, scheduler, 1, device)
         val_loss = evaluate(model, val_loader, criterion, device)

@@ -7,3 +7,5 @@ data/
 wandb/
 
 .DS_Store
+
+capsulnet/

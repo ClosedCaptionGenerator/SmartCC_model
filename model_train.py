@@ -27,8 +27,10 @@ def train(model, train_loader, criterion, optimizer, scheduler, num_epochs, devi
 
         avg_epoch_loss = epoch_loss / len(train_loader)
         print(f"[Epoch {epoch + 1}/{num_epochs}] Loss: {avg_epoch_loss:.4f}")
-        wandb.log({"epoch_loss": avg_epoch_loss, "epoch": epoch + 1})
+        wandb.log({"epoch_loss": avg_epoch_loss, "epoch": epoch + 1, "learning_rate": scheduler.get_last_lr()[0]})
 
         scheduler.step()
+        torch.cuda.empty_cache()
+
 
     print('Finished Training')
