@@ -1,0 +1,18 @@
+{
+    "batch_size": 256,
+    "epochs": 25,
+    "lr": 0.001,
+    "lr-decay": 0.9,
+    "lam-recon": 0.392,
+    "train_data": "/mnt/data/data_model/train/",
+    "val_data": "/mnt/data/data_model/val/",
+    "save_dir": "./result",
+
+    "sample_rate": 22050,
+    "n_fft": 2048,
+    "n_hop": 512,
+    "n_mfcc": 13,
+    "len_raw": 22050,
+    "n_label": 24,
+    "routings": 3
+}
