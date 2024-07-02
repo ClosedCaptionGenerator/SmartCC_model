@@ -9,7 +9,7 @@ import pandas as pd
 import numpy as np
 import json
 import os
-from model.capsule_net import CapsuleNet, margin_loss
+from model.capsulenet import CapsuleNet, margin_loss
 from data_loader.data_loaders import create_dataloaders, prepare_data
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

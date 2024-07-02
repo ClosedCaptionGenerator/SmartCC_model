@@ -1,10 +1,8 @@
-import os
-import sys
-import h5py
 import librosa
 import pandas as pd
 import torch
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import Dataset
+import numpy as np
 
 
 def id_parse(label_name):
@@ -19,9 +17,13 @@ def id_parse(label_name):
     return label_mapping.get(label_name, 24)
 
 def extract_mfcc(file_path, sr, n_mfcc, n_fft, n_hop):
-    y, sr = librosa.load(file_path, sr=sr)
-    mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=n_mfcc, n_fft=n_fft, hop_length=n_hop)
-    return mfcc
+    try:
+        y, sr = librosa.load(file_path, sr=sr)
+        mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=n_mfcc, n_fft=n_fft, hop_length=n_hop)
+        return mfcc
+    except Exception as e:
+        print(f"Error loading {file_path}: {e}")
+        return None
 
 
 def prepare_data(file_path_train):
@@ -42,12 +44,14 @@ def prepare_data(file_path_train):
     return df
 
 class MFCCDataset(Dataset):
-    def __init__(self, df, sr, n_mfcc, n_fft, n_hop, transform=None):
+    def __init__(self, df, sr, n_mfcc, n_fft, n_hop, max_len, width, transform=None):
         self.df = df
         self.sr = sr
         self.n_mfcc = n_mfcc
         self.n_fft = n_fft
         self.n_hop = n_hop
+        self.max_len = max_len
+        self.width = width
         self.transform = transform
 
     def __len__(self):
@@ -58,7 +62,20 @@ class MFCCDataset(Dataset):
         file_path = row['dir_filelist']
         label = row['classID']
         mfcc = extract_mfcc(file_path, self.sr, self.n_mfcc, self.n_fft, self.n_hop)
-        mfcc = mfcc[:, :min(self.n_mfcc, mfcc.shape[1])]
-        if self.transform:
-            mfcc = self.transform(mfcc)
-        return torch.tensor(mfcc, dtype=torch.float32), torch.tensor(label, dtype=torch.long)
+
+        if mfcc is not None:
+            # Pad or truncate the MFCC to ensure consistent length
+            if mfcc.shape[1] < self.width:
+                pad_width = self.width - mfcc.shape[1]
+                mfcc = np.pad(mfcc, ((0, 0), (0, pad_width)), mode='constant')
+            elif mfcc.shape[1] > self.width:
+                mfcc = mfcc[:, :self.width]
+
+            mfcc = mfcc[np.newaxis, ...]  # Add a channel dimension
+            if self.transform:
+                mfcc = self.transform(mfcc)
+            return torch.tensor(mfcc, dtype=torch.float32), torch.tensor(label, dtype=torch.long)
+        else:
+            # Handle the case where MFCC extraction fails
+            return torch.zeros((1, self.n_mfcc, self.width)), torch.tensor(label, dtype=torch.long)
+

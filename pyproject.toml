@@ -8,7 +8,6 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = "^3.10"
 torch = "^2.3.1"
-numpy = "^2.0.0"
 librosa = "^0.10.2.post1"
 wandb = "^0.17.3"
 tqdm = "^4.66.4"
@@ -17,6 +16,7 @@ h5py = "^3.11.0"
 pandas = "^2.2.2"
 seaborn = "^0.13.2"
 matplotlib = "^3.9.0"
+numpy = "^1"
 
 
 [build-system]
