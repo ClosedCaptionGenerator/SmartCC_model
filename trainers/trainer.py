@@ -3,11 +3,12 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+from torch.cuda.amp import autocast, GradScaler
 from datetime import datetime
 from tqdm import tqdm
 import wandb
 
-
+scaler = GradScaler()
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def train(model, train_loader, val_loader, config):
@@ -15,7 +16,7 @@ def train(model, train_loader, val_loader, config):
     optimizer = optim.Adam(model.parameters(), lr=config['lr'])
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=config['lr-decay'])
 
-    wandb.init(project="aws-train-0701", config=config)
+    wandb.init(project="aws-train-0703", config=config)
     best_accuracy = 0.0
 
     for epoch in range(1, config['epochs'] + 1):
@@ -26,8 +27,18 @@ def train(model, train_loader, val_loader, config):
         for data, target in tqdm(train_loader):
             data, target = data.to(device), target.to(device)
             optimizer.zero_grad()
-            output, reconstructions = model(data)
             target_one_hot = F.one_hot(target, num_classes=config['n_label']).float()
+
+            # amp
+            # with autocast():
+            #     output, reconstructions = model(data)
+            #     loss = model.combined_loss(data, output, target_one_hot, reconstructions, config['lam_recon'])
+
+            # scaler.scale(loss).backward()
+            # scaler.step(optimizer)
+            # scaler.update()
+
+            output, reconstructions = model(data)
             loss = model.combined_loss(data, output, target_one_hot, reconstructions, config['lam_recon'])
             loss.backward()
             optimizer.step()
@@ -35,6 +46,8 @@ def train(model, train_loader, val_loader, config):
             total_loss += loss.item()
             pred = output.argmax(dim=1, keepdim=True)
             correct += pred.eq(target.view_as(pred)).sum().item()
+
+            torch.cuda.empty_cache()
 
         train_accuracy = correct / len(train_loader.dataset)
         train_loss = total_loss / len(train_loader.dataset)
@@ -65,8 +78,6 @@ def validate(model, val_loader, config):
             data, target = data.to(device), target.to(device)
             output, reconstructions = model(data)
             target_one_hot = F.one_hot(target, num_classes=config['n_label']).float()
-            print(f'target_one_hot shape: {target_one_hot.shape}')
-            print(f'output shape: {output.shape}')  # Debugging
             loss = model.combined_loss(data, output, target_one_hot, reconstructions, config['lam_recon'])
             val_loss += loss.item()
             pred = output.argmax(dim=1, keepdim=True)

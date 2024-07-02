@@ -28,6 +28,7 @@ if __name__ == "__main__":
         config = json.load(f)
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print(f"using device : {device}")
 
     train_data_paths = get_wav_files(config['train_data'])
     val_data_paths = get_wav_files(config['val_data'])
@@ -44,6 +45,6 @@ if __name__ == "__main__":
         n_class=n_class,
         config=config).to(device)
 
-    wandb.init(project="aws-train-0702", config=config)
+    wandb.init(project="aws-train-0703", config=config)
     trained_model = train(model, train_loader, val_loader, config)
     torch.save(trained_model.state_dict(), os.path.join(config['save_dir'], 'model.pth'))

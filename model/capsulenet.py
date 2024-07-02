@@ -52,16 +52,16 @@ class PrimaryCaps(nn.Module):
         return x
 
 class CapsuleLayer(nn.Module):
-    def __init__(self, num_capsule, dim_capsule, batch_size, routings=3):
+    def __init__(self, num_capsule, dim_capsule, routings=3):
         super(CapsuleLayer, self).__init__()
         self.num_capsule = num_capsule
         self.dim_capsule = dim_capsule
-        self.batch_size = batch_size
         self.routings = routings
         self.W = None
 
     def forward(self, inputs):
         device = inputs.device
+        batch_size = inputs.size(0)
         input_num_capsule = inputs.size(1)
         input_dim_capsule = inputs.size(2)
 
@@ -70,10 +70,10 @@ class CapsuleLayer(nn.Module):
 
         inputs_expand = inputs.unsqueeze(1).unsqueeze(4)
         inputs_tiled = inputs_expand.repeat(1, self.num_capsule, 1, 1, 1)
-        W_tiled = self.W.repeat(inputs.size(0), 1, 1, 1, 1)  # [batch_size, num_capsule, input_num_capsule, dim_capsule, input_dim_capsule]
+        W_tiled = self.W.repeat(batch_size, 1, 1, 1, 1)  # [batch_size, num_capsule, input_num_capsule, dim_capsule, input_dim_capsule]
         inputs_hat = torch.matmul(W_tiled, inputs_tiled).squeeze(-1)  # [batch_size, num_capsule, input_num_capsule, dim_capsule]
 
-        b_ij = torch.zeros(self.batch_size, self.num_capsule, input_num_capsule).to(device)
+        b_ij = torch.zeros(batch_size, self.num_capsule, input_num_capsule).to(device)
 
         for i in range(self.routings):
             c_ij = F.softmax(b_ij, dim=1)
@@ -114,7 +114,7 @@ class CapsNet(nn.Module):
         self.conv1 = ConvLayer(config['cnn1_in_channels'], config['cnn1_out_channels'], tuple(config['cnn1_kernel_size']), tuple(config['cnn1_stride']), tuple(config['cnn1_padding']))
         self.conv2 = ConvLayer(config['cnn2_in_channels'], config['cnn2_out_channels'], tuple(config['cnn2_kernel_size']), tuple(config['cnn2_stride']), config['cnn2_padding'])
         self.primary_capsules = PrimaryCaps(config['pc_in_channels'], config['pc_dim_capsule'], config['pc_n_channels'], config['pc_kernel_size'], config['pc_stride'], config['pc_padding'])
-        self.digit_capsules = CapsuleLayer(n_class, config['dc_dim_capsule'], config['batch_size'], config['routings'])
+        self.digit_capsules = CapsuleLayer(n_class, config['dc_dim_capsule'], config['routings'])
         self.distance = Distance()
         self.mask = Mask()
         self.decoder = Decoder(input_shape=input_shape, n_class=n_class)
@@ -135,8 +135,6 @@ class CapsNet(nn.Module):
         return out_caps, reconstruction
 
     def margin_loss(self, y_true, y_pred):
-        print(f'y_true shape: {y_true.shape}')
-        print(f'y_pred shape: {y_pred.shape}')
         m_plus = 0.9
         m_minus = 0.1
         lambda_val = 0.5
@@ -154,3 +152,17 @@ class CapsNet(nn.Module):
 
     def combined_loss(self, x, y_pred, y_true, reconstructions, lam_recon):
         return self.margin_loss(y_true, y_pred) + lam_recon * self.reconstruction_loss(x, reconstructions)
+
+# # Load config
+# import json
+# with open('./config/config.json', 'r') as f:
+#     config = json.load(f)
+
+# # Instantiate and verify the shape
+# input_shape = (1, 48, 173)
+# capsnet = CapsNet(input_shape=input_shape, n_class=config['n_label'], config=config)
+# dummy_input = torch.randn(256, *input_shape)
+# out_caps, recon = capsnet(dummy_input)
+
+# print(f"Final output capsule shape: {out_caps.shape}")
+# print(f"Reconstructed image shape: {recon.shape}")
