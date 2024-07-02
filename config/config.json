@@ -3,7 +3,7 @@
     "epochs": 30,
     "lr": 0.001,
     "lr-decay": 0.9,
-    "lam-recon": 0.392,
+    "lam_recon": 0.392,
     "train_data": "/mnt/data/data_model/train/",
     "val_data": "/mnt/data/data_model/val/",
     "save_dir": "./result",
@@ -28,7 +28,7 @@
 
     "cnn2_in_channels": 8,
     "cnn2_out_channels": 256,
-    "cnn2_kernel_size": 5,
+    "cnn2_kernel_size": [5, 5],
     "cnn2_stride": [1, 2],
     "cnn2_padding": 0,
 
@@ -39,10 +39,5 @@
     "pc_stride": 2,
     "pc_padding":0,
 
-    "dc_num_routes": 1152,
-    "dc_dim_capsule": 16,
-    "dc_out_channels": 16,
-
-    "input_width": 28,
-    "input_height": 28
+    "dc_dim_capsule": 16
 }

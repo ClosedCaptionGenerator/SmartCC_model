@@ -35,13 +35,14 @@ if __name__ == "__main__":
     df_train = prepare_data(train_data_paths)
     df_val = prepare_data(val_data_paths)
 
-    train_loader, val_loader = create_dataloaders(df_train, df_val, batch_size=config['batch_size'], sr=config['sample_rate'],
+    train_loader, val_loader, input_shape, n_class = create_dataloaders(df_train, df_val, batch_size=config['batch_size'], sr=config['sample_rate'],
                                                   n_mfcc=config['n_mfcc'], n_fft=config['n_fft'], n_hop=config['n_hop'], max_len=config['max_len'], width=config['width'])
 
-    sample_data, _ = next(iter(train_loader))
-    input_shape = sample_data.shape[1:]  # Exclude the batch size
 
-    model = CapsNet(input_shape=input_shape, config=config).to(device)
+    model = CapsNet(
+        input_shape=input_shape,
+        n_class=n_class,
+        config=config).to(device)
 
     wandb.init(project="aws-train-0702", config=config)
     trained_model = train(model, train_loader, val_loader, config)

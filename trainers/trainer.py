@@ -26,8 +26,9 @@ def train(model, train_loader, val_loader, config):
         for data, target in tqdm(train_loader):
             data, target = data.to(device), target.to(device)
             optimizer.zero_grad()
-            output, reconstructions, masked = model(data)
-            loss = model.loss(data, output, target, reconstructions)
+            output, reconstructions = model(data)
+            target_one_hot = F.one_hot(target, num_classes=config['n_label']).float()
+            loss = model.combined_loss(data, output, target_one_hot, reconstructions, config['lam_recon'])
             loss.backward()
             optimizer.step()
 
@@ -62,8 +63,12 @@ def validate(model, val_loader, config):
     with torch.no_grad():
         for data, target in val_loader:
             data, target = data.to(device), target.to(device)
-            output, reconstructions, masked = model(data)
-            val_loss += model.loss(data, output, target, reconstructions).item()
+            output, reconstructions = model(data)
+            target_one_hot = F.one_hot(target, num_classes=config['n_label']).float()
+            print(f'target_one_hot shape: {target_one_hot.shape}')
+            print(f'output shape: {output.shape}')  # Debugging
+            loss = model.combined_loss(data, output, target_one_hot, reconstructions, config['lam_recon'])
+            val_loss += loss.item()
             pred = output.argmax(dim=1, keepdim=True)
             correct += pred.eq(target.view_as(pred)).sum().item()
 
@@ -71,3 +76,4 @@ def validate(model, val_loader, config):
     accuracy = correct / len(val_loader.dataset)
 
     return val_loss, accuracy
+
