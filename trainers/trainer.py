@@ -24,30 +24,24 @@ def train(model, train_loader, val_loader, config):
         total_loss = 0
         correct = 0
 
-        for data, target in tqdm(train_loader):
+        for batch_idx, (data, target) in enumerate(tqdm(train_loader)):
             data, target = data.to(device), target.to(device)
-            optimizer.zero_grad()
             target_one_hot = F.one_hot(target, num_classes=config['n_label']).float()
+            optimizer.zero_grad()
 
             # amp
-            # with autocast():
-            #     output, reconstructions = model(data)
-            #     loss = model.combined_loss(data, output, target_one_hot, reconstructions, config['lam_recon'])
+            with autocast():
+                output, reconstructions = model(data)
+                loss = model.combined_loss(data, output, target_one_hot, reconstructions, config['lam_recon'])
 
-            # scaler.scale(loss).backward()
-            # scaler.step(optimizer)
-            # scaler.update()
-
-            output, reconstructions = model(data)
-            loss = model.combined_loss(data, output, target_one_hot, reconstructions, config['lam_recon'])
-            loss.backward()
-            optimizer.step()
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
 
             total_loss += loss.item()
-            pred = output.argmax(dim=1, keepdim=True)
-            correct += pred.eq(target.view_as(pred)).sum().item()
+            _, pred = torch.max(output.data, 1)
+            correct += (pred == target).sum().item()
 
-            torch.cuda.empty_cache()
 
         train_accuracy = correct / len(train_loader.dataset)
         train_loss = total_loss / len(train_loader.dataset)
@@ -68,6 +62,7 @@ def train(model, train_loader, val_loader, config):
 
     return model
 
+
 def validate(model, val_loader, config):
     model.eval()
     val_loss = 0
@@ -76,12 +71,11 @@ def validate(model, val_loader, config):
     with torch.no_grad():
         for data, target in val_loader:
             data, target = data.to(device), target.to(device)
-            output, reconstructions = model(data)
             target_one_hot = F.one_hot(target, num_classes=config['n_label']).float()
-            loss = model.combined_loss(data, output, target_one_hot, reconstructions, config['lam_recon'])
-            val_loss += loss.item()
-            pred = output.argmax(dim=1, keepdim=True)
-            correct += pred.eq(target.view_as(pred)).sum().item()
+            output, reconstructions = model(data)
+            val_loss += model.combined_loss(data, output, target_one_hot, reconstructions, config['lam_recon']).item()
+            _, predicted = torch.max(output.data, 1)
+            correct += (predicted == target).sum().item()
 
     val_loss /= len(val_loader.dataset)
     accuracy = correct / len(val_loader.dataset)

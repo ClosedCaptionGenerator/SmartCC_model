@@ -1,81 +1,123 @@
-import librosa
-import pandas as pd
-import torch
-from torch.utils.data import Dataset
+import os
 import numpy as np
-
-
-def id_parse(label_name):
-    label_mapping = {
-        '1.차량경적': 0, '2.차량사이렌': 1, '3.차량주행음': 2, '4.이륜차경적': 3,
-        '5.이륜차주행음': 4, '6.비행기': 5, '7.헬리콥터': 6, '8.기차': 7,
-        '9.지하철': 8, '10.발소리': 9, '11.가구소리': 10, '12.청소기': 11,
-        '13.세탁기': 12, '14.개': 13, '15.고양이': 14, '16.공구': 15,
-        '17.악기': 16, '18.항타기': 17, '19.파쇄기': 18, '20.콘크리트펌프': 19,
-        '21.발전기': 20, '22.절삭기': 21, '23.송풍기': 22, '24.압축기': 23
-    }
-    return label_mapping.get(label_name, 24)
-
-def extract_mfcc(file_path, sr, n_mfcc, n_fft, n_hop):
-    try:
-        y, sr = librosa.load(file_path, sr=sr)
-        mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=n_mfcc, n_fft=n_fft, hop_length=n_hop)
-        return mfcc
-    except Exception as e:
-        print(f"Error loading {file_path}: {e}")
-        return None
-
-
-def prepare_data(file_path_train):
-    dirlist = []
-    index = []
-    filename = []
-
-    for i in file_path_train:
-        try:
-            filename.append(i.split('/')[-1])
-            dirlist.append(i)
-            index.append(id_parse(i.split('/')[-2]))
-        except Exception as e:
-            print(e)
-
-    df = pd.DataFrame({'classID': index, 'dir_filelist': dirlist, 'slice_filename': filename})
-    df['classID'] = df['classID'].astype(int)
-    return df
+import torch
+import h5py
+import torch.nn.functional as F
+from torch.utils.data import Dataset
+import librosa
+import glob
 
 class MFCCDataset(Dataset):
-    def __init__(self, df, sr, n_mfcc, n_fft, n_hop, max_len, width, transform=None):
-        self.df = df
+    def __init__(self, mfcc_data, labels):
+        self.mfcc_data = mfcc_data
+        self.labels = labels
+
+    def __len__(self):
+        return len(self.labels)
+
+    def __getitem__(self, idx):
+        mfcc = self.mfcc_data[idx]
+        label = self.labels[idx]
+        mfcc = torch.tensor(mfcc, dtype=torch.float32).permute(2, 0, 1)  # Change the shape to [C, H, W]
+        label = torch.tensor(label, dtype=torch.long)
+        return mfcc, label
+
+
+class AudioDataset(Dataset):
+    def __init__(self, file_paths, labels, sr, n_mfcc, n_fft, n_hop, max_len, transform=None):
+        self.file_paths = file_paths
+        self.labels = labels
         self.sr = sr
         self.n_mfcc = n_mfcc
         self.n_fft = n_fft
         self.n_hop = n_hop
         self.max_len = max_len
-        self.width = width
         self.transform = transform
 
     def __len__(self):
-        return len(self.df)
+        return len(self.file_paths)
 
     def __getitem__(self, idx):
-        row = self.df.iloc[idx]
-        file_path = row['dir_filelist']
-        label = row['classID']
-        mfcc = extract_mfcc(file_path, self.sr, self.n_mfcc, self.n_fft, self.n_hop)
+        file_path = self.file_paths[idx]
+        label = self.labels[idx]
 
-        if mfcc is not None:
-            # Pad or truncate the MFCC to ensure consistent length
-            if mfcc.shape[1] < self.width:
-                pad_width = self.width - mfcc.shape[1]
-                mfcc = np.pad(mfcc, ((0, 0), (0, pad_width)), mode='constant')
-            elif mfcc.shape[1] > self.width:
-                mfcc = mfcc[:, :self.width]
+        # Load audio file
+        audio, sr = librosa.load(file_path, sr=self.sr, duration=self.max_len)
 
-            mfcc = mfcc[np.newaxis, ...]  # Add a channel dimension
-            if self.transform:
-                mfcc = self.transform(mfcc)
-            return torch.tensor(mfcc, dtype=torch.float32), torch.tensor(label, dtype=torch.long)
-        else:
-            # Handle the case where MFCC extraction fails
-            return torch.zeros((1, self.n_mfcc, self.width)), torch.tensor(label, dtype=torch.long)
+        # Ensure the audio length is consistent
+        if len(audio) < self.max_len * self.sr:
+            padding = self.max_len * self.sr - len(audio)
+            audio = np.pad(audio, (0, int(padding)), 'constant')
 
+        # Extract MFCC features
+        mfcc = librosa.feature.mfcc(y=audio, sr=self.sr, n_mfcc=self.n_mfcc, n_fft=self.n_fft, hop_length=self.n_hop)
+
+        pad_width = max(0, self.n_mfcc - mfcc.shape[1])
+        mfcc = np.pad(mfcc, ((0, 0), (0, pad_width)), mode='constant')
+
+        if self.transform:
+            mfcc = self.transform(mfcc)
+
+        # Convert label to tensor
+        mfcc = torch.tensor(mfcc, dtype=torch.float32)
+        label = torch.tensor(label, dtype=torch.long)
+
+        return mfcc, label
+
+
+def get_file_paths_and_labels(data_dir, label_mapping):
+    file_paths = []
+    labels = []
+
+    for label_name, label_id in label_mapping.items():
+        # Adjust the pattern to match the nested directory structure
+        pattern = os.path.join(data_dir, '**', label_name, '*.wav')
+        class_files = glob.glob(pattern, recursive=True)
+        print(f"Found {len(class_files)} files for label '{label_name}' with pattern {pattern}")
+        file_paths.extend(class_files)
+        labels.extend([label_id] * len(class_files))
+
+    return file_paths, labels
+
+
+def load_dataset(save_hdf_train, save_hdf_validation, n_label, height, width):
+    x_train_mfcc = []
+    y_train_mfcc = []
+    x_val_mfcc = []
+    y_val_mfcc = []
+
+    for i in range(n_label):  # 0~23 labels
+        for ds_name in ['mfcc', 'y']:
+            if ds_name == 'mfcc':
+                count = f"mfcc_y_{height}x{width}_{i}"
+                with h5py.File(save_hdf_train + count + '.h5', 'r') as mfcc:
+                    x_train_mfcc.extend(mfcc[ds_name])
+            if ds_name == 'y':
+                count = f"mfcc_y_{height}x{width}_{i}"
+                with h5py.File(save_hdf_train + count + '.h5', 'r') as mfcc:
+                    y_train_mfcc.extend(mfcc[ds_name])
+
+        for ds_name in ['mfcc', 'y']:
+            if ds_name == 'mfcc':
+                count = f"mfcc_y_{height}x{width}_{i}"
+                with h5py.File(save_hdf_validation + count + '.h5', 'r') as mfcc:
+                    x_val_mfcc.extend(mfcc[ds_name])
+            if ds_name == 'y':
+                count = f"mfcc_y_{height}x{width}_{i}"
+                with h5py.File(save_hdf_validation + count + '.h5', 'r') as mfcc:
+                    y_val_mfcc.extend(mfcc[ds_name])
+
+    train_x = np.array(x_train_mfcc).reshape(-1, height, width, 1)
+    test_x = np.array(x_val_mfcc).reshape(-1, height, width, 1)
+    train_y = np.array(y_train_mfcc)
+    test_y = np.array(y_val_mfcc)
+
+    train_y = np.argmax(train_y, axis=1).reshape(-1)
+    test_y = np.argmax(test_y, axis=1).reshape(-1)
+    train_y = F.one_hot(torch.tensor(train_y), num_classes=n_label).float()
+    test_y = F.one_hot(torch.tensor(test_y), num_classes=n_label).float()
+
+    print('normal x:', train_x.shape, test_x.shape)
+    print('normal y:', train_y.shape, test_y.shape)
+
+    return (train_x, train_y), (test_x, test_y)
