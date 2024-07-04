@@ -51,7 +51,6 @@ class AudioDataset(Dataset):
 
         # Extract MFCC features
         mfcc = librosa.feature.mfcc(y=audio, sr=self.sr, n_mfcc=self.n_mfcc, n_fft=self.n_fft, hop_length=self.n_hop)
-
         pad_width = max(0, self.n_mfcc - mfcc.shape[1])
         mfcc = np.pad(mfcc, ((0, 0), (0, pad_width)), mode='constant')
 
@@ -59,7 +58,7 @@ class AudioDataset(Dataset):
             mfcc = self.transform(mfcc)
 
         # Convert label to tensor
-        mfcc = torch.tensor(mfcc, dtype=torch.float32)
+        mfcc = torch.tensor(mfcc, dtype=torch.float32).unsqueeze(0) 
         label = torch.tensor(label, dtype=torch.long)
 
         return mfcc, label

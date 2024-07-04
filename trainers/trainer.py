@@ -7,6 +7,7 @@ from torch.cuda.amp import autocast, GradScaler
 from datetime import datetime
 from tqdm import tqdm
 import wandb
+from utils.utils import CapsuleLoss
 
 scaler = GradScaler()
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -15,8 +16,9 @@ def train(model, train_loader, val_loader, config):
     model.to(device)
     optimizer = optim.Adam(model.parameters(), lr=config['lr'])
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=1, gamma=config['lr-decay'])
+    loss_fn = CapsuleLoss(lam_recon=config['lam_recon'])
 
-    wandb.init(project="aws-train-0703", config=config)
+    wandb.init(project="aws-train-0704", config=config)
     best_accuracy = 0.0
 
     for epoch in range(1, config['epochs'] + 1):
@@ -24,7 +26,7 @@ def train(model, train_loader, val_loader, config):
         total_loss = 0
         correct = 0
 
-        for batch_idx, (data, target) in enumerate(tqdm(train_loader)):
+        for data, target in tqdm(train_loader):
             data, target = data.to(device), target.to(device)
             target_one_hot = F.one_hot(target, num_classes=config['n_label']).float()
             optimizer.zero_grad()
@@ -32,14 +34,16 @@ def train(model, train_loader, val_loader, config):
             # amp
             with autocast():
                 output, reconstructions = model(data)
-                loss = model.combined_loss(data, output, target_one_hot, reconstructions, config['lam_recon'])
+                loss = loss_fn(target_one_hot, output, reconstructions, data)
 
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
 
             total_loss += loss.item()
-            _, pred = torch.max(output.data, 1)
+            lengths = torch.sqrt((output ** 2).sum(dim=2))
+            _, pred = lengths.max(dim=1)
+            # _, pred = torch.max(output.data, 1)
             correct += (pred == target).sum().item()
 
 
@@ -67,14 +71,17 @@ def validate(model, val_loader, config):
     model.eval()
     val_loss = 0
     correct = 0
+    loss_fn = CapsuleLoss(lam_recon=config['lam_recon'])
+
 
     with torch.no_grad():
         for data, target in val_loader:
             data, target = data.to(device), target.to(device)
             target_one_hot = F.one_hot(target, num_classes=config['n_label']).float()
             output, reconstructions = model(data)
-            val_loss += model.combined_loss(data, output, target_one_hot, reconstructions, config['lam_recon']).item()
-            _, predicted = torch.max(output.data, 1)
+            val_loss += loss_fn(target_one_hot, output, reconstructions, data)
+            lengths = torch.sqrt((output ** 2).sum(dim=2))
+            _, predicted = lengths.max(dim=1)
             correct += (predicted == target).sum().item()
 
     val_loss /= len(val_loader.dataset)
